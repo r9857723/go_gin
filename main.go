@@ -1,18 +1,11 @@
 package main
 
 import (
+	"errors"
 	"github.com/gin-gonic/gin"
 	"net/http"
 	"strconv"
 )
-
-var balance = 0
-
-type Result struct {
-	Amount int `json="amount"`
-	Status string `json="status"`
-	Message string `json="message"`
-}
 
 func main() {
 	router := gin.Default()
@@ -22,86 +15,85 @@ func main() {
 	router.Run(":8080")
 }
 
-func wrapResponse(context *gin.Context, amount int ,err error) {
-	var result = Result{
-		Amount: balance,
-		Status: "ok",
+// 提款
+func withdraw(c *gin.Context) {
+	input := c.Param("input")
+	amount, err := strconv.Atoi(input)
+	if err != nil {
+		preview(c, bank, err)
+	}
+	err = bank.Withdrawal(amount)
+	if err != nil {
+		preview(c, bank, err)
+	}
+	preview(c, bank, nil)
+}
+
+// 存款
+func deposit(c *gin.Context) {
+	input := c.Param("input")
+	amount, err := strconv.Atoi(input)
+	if err != nil {
+		preview(c, bank, err)
+	}
+	err = bank.Save(amount)
+	if err != nil {
+		preview(c, bank, err)
+	}
+	preview(c, bank, nil)
+
+}
+
+// 取得餘額
+func getBalance(c *gin.Context) {
+	preview(c, bank, nil)
+}
+
+func preview(c *gin.Context, b *Bank, err error) {
+	r := struct {
+		Amount  int    `json="amount"`
+		Status  string `json="status"`
+		Message string `json="message"`
+	}{
+		Amount:  b.GetAmount(),
+		Status:  "ok",
 		Message: "",
 	}
 	if err != nil {
-		result.Amount = 0
-		result.Status = "failed"
-		result.Message = err.Error()
-	}
-	context.JSON(http.StatusOK, result)
-}
-
-func withdraw(c *gin.Context) {
-	var status string
-	var msg string
-	input := c.Param("input")
-	amount, err := strconv.Atoi(input)
-	if err == nil {
-		if amount <= 0 {
-			amount = 0
-			status = "failed"
-			msg = "提款金額小於等於０ 提款失敗"
-		} else {
-			if balance - amount < 0 {
-				amount = 0
-				status = "failed"
-				msg = "餘額不足 提款失敗"
-			} else {
-				balance -= amount
-				status = "ok"
-				msg = "提款成功"
-			}
-		}
-	} else {
-		amount = 0
-		status = "failed"
-		msg = "提款失敗"
+		r.Amount = 0
+		r.Status = "fail"
+		r.Message = err.Error()
 	}
 
-	c.JSON(http.StatusOK, gin.H{
-		"amount":  amount,
-		"status":  status,
-		"message": msg,
-	})
+	c.JSON(http.StatusOK, r)
 }
 
-func deposit(c *gin.Context) {
-	var status string
-	var msg string
-	input := c.Param("input")
-	amount, err := strconv.Atoi(input)
-	if err == nil {
-		if amount <= 0 {
-			amount = 0
-			status = "failed"
-			msg = "存款金額小於0,存款失敗"
-		} else {
-			balance += amount
-			status = "ok"
-			msg = "成功存款" + strconv.Itoa(amount) + "元"
-		}
-	} else {
-		amount = 0
-		status = "failed"
-		msg = "存款失敗"
+type Bank struct {
+	amount int `json="amount"`
+}
+
+var bank = &Bank{
+	amount: 0,
+}
+
+func (b *Bank) GetAmount() int {
+	return b.amount
+}
+func (b *Bank) Save(amount int) (err error) {
+	if amount < 0 {
+		return errors.New("操作失敗，存款金額須大於０")
 	}
-
-	c.JSON(http.StatusOK, gin.H{
-		"amount":  amount,
-		"status":  status,
-		"message": msg,
-	})
+	b.amount += amount
+	return
 }
-func getBalance(c *gin.Context) {
-	msg := "您的帳戶內有:" + strconv.Itoa(balance) + "元"
-	c.JSON(http.StatusOK, gin.H{
-		"amount":  balance,
-		"status":  "OK",
-		"message": msg,
-	})
+
+func (b *Bank) Withdrawal(amount int) (err error) {
+	if amount < 0 {
+		return errors.New("操作失敗，提款金額須大於０")
+	}
+	if b.amount-amount < 0 {
+		return errors.New("操作失敗，存款不足")
+	}
+	b.amount -= amount
+	return
 }
