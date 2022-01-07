@@ -26,7 +26,6 @@ func withdraw(c *gin.Context) {
 	if err != nil {
 		preview(c, bank, err)
 	}
-	preview(c, bank, nil)
 }
 
 // 存款
@@ -40,7 +39,6 @@ func deposit(c *gin.Context) {
 	if err != nil {
 		preview(c, bank, err)
 	}
-	preview(c, bank, nil)
 
 }
 
@@ -79,6 +77,7 @@ var bank = &Bank{
 func (b *Bank) GetAmount() int {
 	return b.amount
 }
+
 func (b *Bank) Save(amount int) (err error) {
 	if amount < 0 {
 		return errors.New("操作失敗，存款金額須大於０")
